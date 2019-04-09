@@ -1,0 +1,91 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Rscript -e "rmarkdown::render('Violin_Plot_NL_MCI_Severe.Rmd')"
+
+Loading packages
+```{r loading packages}
+library(wrapr)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(Biobase)
+rm(list=ls())
+```
+
+
+Functions
+```{r Functions}
+subset_expressionset <- function(expressionset, gene_id, group_column, group_name){
+	expr_group <- exprs(expressionset[gene_id, expressionset[[group_column]] == group_name])
+	}
+```
+
+
+Reading expressionsets
+```{r Reading expressionsets}
+exprset_path <- paste0("/sc/orga/projects/zhangb03a/lei_guo/Expressionset_MSBB_ROSMAP_Mayo/Expressionset/", c("Exprset.BM_10.PMI_race_sex_RIN_exonicRate_rRnaRate_batch_adj.RDS", "Exprset.BM_22.PMI_race_sex_RIN_exonicRate_rRnaRate_batch_adj.RDS", "Exprset.BM_36.PMI_race_sex_RIN_exonicRate_rRnaRate_batch_adj.RDS", "Exprset.BM_44.PMI_race_sex_RIN_exonicRate_rRnaRate_batch_adj.RDS", "Exprset.ROSMAP_log2FPKM.batch_pmi_msex_RIN_adj.no_outliers.symbol_clean.RDS"))
+
+exprset_ls <- lapply(exprset_path, readRDS)
+names(exprset_ls) <- c("BM10", "BM22", "BM36", "BM44", "ROSMAP")
+```
+
+
+
+Subsetting expressionset
+```{r Subsetting expressionset}
+# subsetting LRP4 (NL, MCI, Severe)
+lrp4_nl <- lapply(exprset_ls, subset_expressionset, gene_id = "ENSG00000134569", group_column = "severity", group_name = "NL")
+lrp4_nl <- lapply(lrp4_nl, t)
+
+lrp4_mci <- lapply(exprset_ls, subset_expressionset, gene_id = "ENSG00000134569", group_column = "severity", group_name = "MCI")
+lrp4_mci <- lapply(lrp4_mci, t)
+
+lrp4_sev <- lapply(exprset_ls, subset_expressionset, gene_id = "ENSG00000134569", group_column = "severity", group_name = "Severe")
+lrp4_sev <- lapply(lrp4_sev, t)
+
+
+# combining LRP4 expression for each brain region
+expr_lrp4 <- mapply(rbind, lrp4_nl, lrp4_mci, lrp4_sev, SIMPLIFY = F)
+# adding severity column
+severity_col <- unlist(mapply(rep, c("NL", "MCI", "Severe", "NL", "MCI", "Severe", "NL", "MCI", "Severe", "NL", "MCI", "Severe", "NL", "MCI", "Severe"), c(nrow(lrp4_nl[[1]]), nrow(lrp4_mci[[1]]), nrow(lrp4_sev[[1]]), nrow(lrp4_nl[[2]]), nrow(lrp4_mci[[2]]), nrow(lrp4_sev[[2]]), nrow(lrp4_nl[[3]]), nrow(lrp4_mci[[3]]), nrow(lrp4_sev[[3]]), nrow(lrp4_nl[[4]]), nrow(lrp4_mci[[4]]), nrow(lrp4_sev[[4]]), nrow(lrp4_nl[[5]]), nrow(lrp4_mci[[5]]), nrow(lrp4_sev[[5]])), SIMPLIFY = F))
+# adding dataset column
+dataset_col <- unlist(mapply(rep, c("BM10", "BM22", "BM36", "BM44", "ROSMAP"), c((nrow(lrp4_nl[[1]]) + nrow(lrp4_mci[[1]]) + nrow(lrp4_sev[[1]])), (nrow(lrp4_nl[[2]]) + nrow(lrp4_mci[[2]]) + nrow(lrp4_sev[[2]])), (nrow(lrp4_nl[[3]]) + nrow(lrp4_mci[[3]]) + nrow(lrp4_sev[[3]])), (nrow(lrp4_nl[[4]]) + nrow(lrp4_mci[[4]]) + nrow(lrp4_sev[[4]])), (nrow(lrp4_nl[[5]]) + nrow(lrp4_mci[[5]]) + nrow(lrp4_sev[[5]]))), SIMPLIFY = F))
+
+# making df
+expr_lrp4 <- as.data.frame(do.call(rbind, expr_lrp4))
+expr_lrp4$severity <- severity_col
+expr_lrp4$Dataset <- dataset_col
+expr_lrp4$SampleID <- rownames(expr_lrp4)
+expr_lrp4$severity <- factor(expr_lrp4$severity, levels = c("NL", "MCI", "Severe"))
+setDT(expr_lrp4)
+```
+
+
+Violin plot
+```{r Violin plot}
+# BM10 LRP4
+plot_bm10_lrp4 <- ggplot(expr_lrp4[Dataset == "BM10"], aes(x=severity, y=ENSG00000134569)) + geom_violin(trim=FALSE) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1) + stat_summary(geom="pointrange", fun.data = "median_hilow", color="red", size = 1) + xlab("") + ylab("LRP4 Expression (BA10)") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# BM22 LRP4
+plot_bm22_lrp4 <- ggplot(expr_lrp4[Dataset == "BM22"], aes(x=severity, y=ENSG00000134569)) + geom_violin(trim=FALSE) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1) + stat_summary(geom="pointrange", fun.data = "median_hilow", color="red", size = 1) + xlab("") + ylab("LRP4 Expression (BA22)") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# BM36 LRP4
+plot_bm36_lrp4 <- ggplot(expr_lrp4[Dataset == "BM36"], aes(x=severity, y=ENSG00000134569)) + geom_violin(trim=FALSE) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1) + stat_summary(geom="pointrange", fun.data = "median_hilow", color="red", size = 1) + xlab("") + ylab("LRP4 Expression (BA36)") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# BM44 LRP4
+plot_bm44_lrp4 <- ggplot(expr_lrp4[Dataset == "BM44"], aes(x=severity, y=ENSG00000134569)) + geom_violin(trim=FALSE) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1) + stat_summary(geom="pointrange", fun.data = "median_hilow", color="red", size = 1) + xlab("") + ylab("LRP4 Expression (BA44)") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# ROSMAP LRP4
+plot_ROSMAP_lrp4 <- ggplot(expr_lrp4[Dataset == "ROSMAP"], aes(x=severity, y=ENSG00000134569)) + geom_violin(trim=FALSE) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1) + stat_summary(geom="pointrange", fun.data = "median_hilow", color="red", size = 1) + xlab("") + ylab("LRP4 Expression (ROSMAP)") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+
+# combining plots
+plot_all <- ggarrange(plot_bm10_lrp4, plot_bm22_lrp4, plot_bm36_lrp4, plot_bm44_lrp4, plot_ROSMAP_lrp4, ncol = 3, nrow = 2)
+
+# saving plot
+ggsave("/sc/orga/projects/zhangb03a/lei_guo/Plot_Gene_Expression/NL_MCI_Severe/LRP4_expression_violin.png", plot_all, width = 12, height = 8)
+```
+
